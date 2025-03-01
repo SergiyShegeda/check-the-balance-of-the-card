@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        form { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; }
+        button { background-color: #28a745; color: white; padding: 10px; border: none; cursor: pointer; width: 100%; }
+        button:hover { background-color: #218838; }
+        #card-result { margin-top: 10px; }
+        #payment-form { text-align: left; }
+        #payment-form div { margin: 10px 0 20px }
+        .card-button-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Payment Form</h2>
+    <form id="payment-form">
+        <label>Card Number:</label>
+        <div id="card-number"></div>
+
+        <label>Expiration Date (MM/YY):</label>
+        <div id="card-expiry"></div>
+
+        <label>CVC:</label>
+        <div id="card-cvc"></div>
+
+        <div class="card-button-section">
+            <button type="button" id="track-card-btn">Track trial</button>
+            <button type="button" id="thrust-card-btn">Thrust trial</button>
+            <button type="button" id="trend-card-btn">Trend-trial</button>
+        </div>
+        <p id="card-result"></p>
+    </form>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        const stripe = Stripe("<%= stripePublicKey %>"); // Replace with your Stripe Public Key
+        const elements = stripe.elements();
+
+        const cardNumber = elements.create("cardNumber");
+        const cardExpiry = elements.create("cardExpiry");
+        const cardCvc = elements.create("cardCvc");
+
+        cardNumber.mount("#card-number");
+        cardExpiry.mount("#card-expiry");
+        cardCvc.mount("#card-cvc");
+
+        const checkCard = async (amount) => {
+
+            const cardResult = document.getElementById("card-result");
+            cardResult.textContent = "";
+            const { token, error } = await stripe.createToken(cardNumber);
+            if (error) {
+                document.getElementById("card-result").textContent = "Error: " + error.message;
+                return;
+            }
+            const response = await fetch('/create-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    priceId: "<%= price_id %>",
+                    contactId: Date.now(),
+                    contactEmail: "mail@gmail.com",
+                    type: 'card',
+                    cardTokenId: token.id
+                }),
+            });
+            const json = await response.json();
+            if (json?.success) {
+                cardResult.textContent = "Successful!";
+                cardResult.style.color = "green";
+            } else {
+                cardResult.textContent = "Your card has been blocked. Please use your primary debit or credit card.";
+                cardResult.style.color = "red";
+            }
+
+        }
+
+        document.getElementById("track-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(1999);
+        });
+
+        document.getElementById("thrust-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(2999);
+        });
+
+        document.getElementById("trend-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(3999);
+        });
+    </script>
+</body>
+</html>
