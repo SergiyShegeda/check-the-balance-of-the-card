@@ -1,10 +1,3 @@
-POC: Hold full transaction amount until trial period ends
-sk_test_xxxx:  Replace with your Stripe Secret key - file app.js line 3
-pk_test_xxx:  Replace with your Stripe Public Key - file index.html line 35
-
-✅ Card with funds: 4242 4242 4242 4242 (Visa)
-
-❌ Declined card: 4000 0000 0000 0002
 # Stripe Subscription API with Trial and Manual Payment Capture
 
 This project demonstrates how to use Stripe's API to handle subscriptions with a trial period and manual payment capture. When a user signs up for a subscription, the full payment amount is held (authorized) but not charged until the trial period ends. At the end of the trial, the payment is captured, and the user is charged.
@@ -38,3 +31,8 @@ You can install them by running:
 
 ```bash
 npm install express stripe body-parser cors dayjs fs
+```
+### Testing
+✅ Card with funds: 4242 4242 4242 4242 (Visa)
+
+❌ Declined card: 4000 0000 0000 0002
