@@ -41,7 +41,7 @@
 
     <script src="https://js.stripe.com/v3/"></script>
     <script>
-        const stripe = Stripe("<%= stripePublicKey %>"); // Replace with your Stripe Public Key
+        const stripe = Stripe("<%= stripe_public_key %>"); // Replace with your Stripe Public Key
         const elements = stripe.elements();
 
         const cardNumber = elements.create("cardNumber");
@@ -52,7 +52,7 @@
         cardExpiry.mount("#card-expiry");
         cardCvc.mount("#card-cvc");
 
-        const checkCard = async (amount) => {
+        const checkCard = async (price_id) => {
 
             const cardResult = document.getElementById("card-result");
             cardResult.textContent = "";
@@ -65,7 +65,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    priceId: "<%= price_id %>",
+                    priceId: price_id,
                     contactId: Date.now(),
                     contactEmail: "mail@gmail.com",
                     type: 'card',
@@ -85,17 +85,17 @@
 
         document.getElementById("track-card-btn").addEventListener("click", async () => {
             event.preventDefault();
-            await checkCard(1999);
+            await checkCard('<%= trend_stripe_price_id %>');
         });
 
         document.getElementById("thrust-card-btn").addEventListener("click", async () => {
             event.preventDefault();
-            await checkCard(2999);
+            await checkCard('<%= thrust_stripe_price_id %>');
         });
 
         document.getElementById("trend-card-btn").addEventListener("click", async () => {
             event.preventDefault();
-            await checkCard(3999);
+            await checkCard('<%= track_stripe_price_id %>');
         });
     </script>
 </body>

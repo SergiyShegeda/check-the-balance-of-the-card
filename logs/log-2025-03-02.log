@@ -1,0 +1,23 @@
+2025-03-02T08:24:28.157Z: Unhandled event type: subscription_schedule.updated
+2025-03-02T08:24:36.285Z: Captured payment for invoice in_1Qy7p6Lw4o40YMTyvo5AG2v8
+2025-03-02T08:30:18.225Z: Unhandled event type: subscription_schedule.updated
+2025-03-02T08:30:29.346Z: Captured payment for invoice in_1Qy7umLw4o40YMTys7r5cqSI
+2025-03-02T08:33:26.500Z: Captured payment for invoice in_1Qy7xeLw4o40YMTyvJ6HZMq9
+2025-03-02T08:35:01.838Z: Captured payment for invoice in_1Qy7zBLw4o40YMTyRZ8g8wuv
+2025-03-02T08:37:05.450Z: Captured payment for invoice in_1Qy81BLw4o40YMTy44FcCY6q
+2025-03-02T08:40:02.464Z: Unhandled event type: customer.subscription.updated
+2025-03-02T08:40:05.750Z: Captured payment for invoice in_1Qy845Lw4o40YMTyadzqVVLw
+2025-03-02T08:42:03.053Z: Captured payment for invoice in_1Qy85yLw4o40YMTyW9vBkuUU
+2025-03-02T08:44:04.353Z: Captured payment for invoice in_1Qy87wLw4o40YMTyfAFxKDNT
+2025-03-02T08:45:38.437Z: Error handling webhook event: Cannot access 'paymentIntentId' before initialization
+2025-03-02T08:45:40.965Z: Captured payment for invoice in_1Qy89ULw4o40YMTy8gH4cFsr
+2025-03-02T08:47:33.107Z: Error handling webhook event: Test clock advancement underway - cannot perform modifications: clock_1Qy8BFLw4o40YMTyAO5edhBq
+2025-03-02T08:47:35.752Z: Captured payment for invoice in_1Qy8BLLw4o40YMTyXvtas2Xj
+2025-03-02T08:51:28.143Z: Error handling webhook event: Test clock advancement underway - cannot perform modifications: clock_1Qy8F3Lw4o40YMTyfQUiZugT
+2025-03-02T08:51:30.572Z: Captured payment for invoice in_1Qy8F8Lw4o40YMTyvwmqJDHR
+2025-03-02T08:55:07.865Z: Unhandled event type: customer.subscription.updated
+2025-03-02T08:55:11.061Z: Captured payment for invoice in_1Qy8IgLw4o40YMTyUOzWOPOE
+2025-03-02T08:57:13.291Z: Error creating subscription schedule: Invalid phases[1][collection_method]: must be one of send_invoice or charge_automatically
+2025-03-02T08:57:13.294Z: Error in /create-subscription: Failed to create subscription schedule.
+2025-03-02T08:57:59.859Z: Error creating subscription schedule: Invalid phases[1][collection_method]: must be one of send_invoice or charge_automatically
+2025-03-02T08:57:59.861Z: Error in /create-subscription: Failed to create subscription schedule.
