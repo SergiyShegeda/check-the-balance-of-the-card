@@ -146,7 +146,6 @@ async function handleWebhook(req, res) {
                 break;
             case "customer.subscription.deleted":
                 // When the subscription is deleted, capture uncaptured payments if any
-                console.log('event',event);
                 const deletedSubscription = event.data.object;
                 const phase_trial = deletedSubscription.metadata?.phase;
                 const paymentIntentIdForCancellation = deletedSubscription.metadata?.paymentIntent;
