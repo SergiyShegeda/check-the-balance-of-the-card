@@ -20,99 +20,92 @@
     </style>
 </head>
 <body>
-<h2>Payment Form</h2>
-<form id="payment-form">
-    <label>Card Number:</label>
-    <div id="card-number"></div>
+    <h2>Payment Form</h2>
+    <form id="payment-form">
+        <label>Card Number:</label>
+        <div id="card-number"></div>
 
-    <label>Expiration Date (MM/YY):</label>
-    <div id="card-expiry"></div>
+        <label>Expiration Date (MM/YY):</label>
+        <div id="card-expiry"></div>
 
-    <label>CVC:</label>
-    <div id="card-cvc"></div>
+        <label>CVC:</label>
+        <div id="card-cvc"></div>
 
-    <div class="card-button-section">
-        <button type="button" id="track-card-btn">Track trial</button>
-        <button type="button" id="thrust-card-btn">Thrust trial</button>
-        <button type="button" id="trend-card-btn">Trend-trial</button>
-    </div>
-    <p id="card-result"></p>
-</form>
+        <div class="card-button-section">
+            <button type="button" id="track-card-btn">Track trial</button>
+            <button type="button" id="thrust-card-btn">Thrust trial</button>
+            <button type="button" id="trend-card-btn">Trend-trial</button>
+        </div>
+        <p id="card-result"></p>
+    </form>
 
-<script src="https://js.stripe.com/v3/"></script>
-<script>
-    const stripe = Stripe("<%= stripe_public_key %>"); // Replace with your Stripe Public Key
-    const elements = stripe.elements();
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        const stripe = Stripe("<%= stripePublicKey %>"); // Replace with your Stripe Public Key
+        const elements = stripe.elements();
 
-    const cardNumber = elements.create("cardNumber");
-    const cardExpiry = elements.create("cardExpiry");
-    const cardCvc = elements.create("cardCvc");
+        const cardNumber = elements.create("cardNumber");
+        const cardExpiry = elements.create("cardExpiry");
+        const cardCvc = elements.create("cardCvc");
 
-    cardNumber.mount("#card-number");
-    cardExpiry.mount("#card-expiry");
-    cardCvc.mount("#card-cvc");
+        cardNumber.mount("#card-number");
+        cardExpiry.mount("#card-expiry");
+        cardCvc.mount("#card-cvc");
 
-    const checkCard = async (price_id) => {
-        const cardResult = document.getElementById("card-result");
-        cardResult.textContent = "";
-        const {token, error} = await stripe.createToken(cardNumber);
-        if (error) {
-            document.getElementById("card-result").textContent = "Error: " + error.message;
-            return;
-        }
-        try {
-            const response = await fetch('/create-subscription', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    priceId: price_id,
-                    contactId: Date.now(),
-                    contactEmail: "mail@gmail.com", // Use the actual customer's email here
-                    type: 'card',
-                    cardTokenId: token.id
-                }),
+        const checkCard = async (amount) => {
+            const cardResult = document.getElementById("card-result");
+            cardResult.textContent = "";
+            const result = await stripe.createPaymentMethod({
+                type: "card",
+                card: cardNumber,
             });
-
-            const json = await response.json();
-            if (json.success) {
-                cardResult.textContent = "Successful! Payment in process.";
-                cardResult.style.color = "green";
-
-                // Check if 3D Secure authentication is required
-                if (json.requiresAction) {
-                    const { error: authError, paymentIntent } = await stripe.handleCardAction(json.clientSecret);
-                    if (authError) {
-                        cardResult.textContent = "Authentication failed: " + authError.message;
-                        cardResult.style.color = "red";
-                    } else {
-                        cardResult.textContent = "Payment succeeded!";
-                        cardResult.style.color = "green";
-                    }
+            if (!result.error) {
+                const paymentMethodId = result.paymentMethod.id;
+                const response = await fetch('/create-payment-intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customData: {
+                            amount,
+                            currency: 'usd',
+                            contactId: Date.now(),
+                            contactEmail: "mail@gmail.com",
+                        },
+                        order: {
+                            metadata: {
+                                payment_method: paymentMethodId,
+                            }
+                        }
+                    }),
+                });
+                const json = await response.json();
+                if (json?.success) {
+                    cardResult.textContent = "Successful!";
+                    cardResult.style.color = "green";
+                } else {
+                    cardResult.textContent = "Your card has been blocked. Please use your primary debit or credit card.";
+                    cardResult.style.color = "red";
                 }
             } else {
-                cardResult.textContent = "Your card has been blocked. Please use your primary debit or credit card.";
+                cardResult.textContent = result.error;
                 cardResult.style.color = "red";
             }
-        } catch (error) {
-            cardResult.textContent = "Error: " + error.message;
-            cardResult.style.color = "red";
         }
-    };
 
-    document.getElementById("track-card-btn").addEventListener("click", async (event) => {
-        event.preventDefault();
-        await checkCard('<%= trend_stripe_price_id %>');
-    });
+        document.getElementById("track-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(1999);
+        });
 
-    document.getElementById("thrust-card-btn").addEventListener("click", async (event) => {
-        event.preventDefault();
-        await checkCard('<%= thrust_stripe_price_id %>');
-    });
+        document.getElementById("thrust-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(2999);
+        });
 
-    document.getElementById("trend-card-btn").addEventListener("click", async (event) => {
-        event.preventDefault();
-        await checkCard('<%= track_stripe_price_id %>');
-    });
-</script>
+        document.getElementById("trend-card-btn").addEventListener("click", async () => {
+            event.preventDefault();
+            await checkCard(3999);
+        });
+    </script>
 </body>
 </html>
