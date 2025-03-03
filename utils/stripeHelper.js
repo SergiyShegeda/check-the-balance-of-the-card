@@ -35,8 +35,13 @@ async function createCustomerAndSavePayment(email, paymentMethodId, priceId) {
                 allow_redirects: "never",
             },
         });
+        // Check if the PaymentIntent requires authentication (3D Secure)
+        if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_source_action') {
+            return { customer, paymentIntent, requiresAction: true, clientSecret: paymentIntent.client_secret };
+        }
 
-        return { customer, paymentIntent };
+        // If no authentication is required, simply return the customer and PaymentIntent
+        return { customer, paymentIntent, requiresAction: false };
     } catch (error) {
         await writeLog(`Error creating customer: ${error.message}`);
         throw new Error("Failed to create customer and setup payment method.");
@@ -46,7 +51,7 @@ async function createCustomerAndSavePayment(email, paymentMethodId, priceId) {
 async function createSubscriptionSchedule(customerId, trialPriceId, paidPriceId, paymentMethodId, paymentIntent) {
     try {
         const now = Math.floor(Date.now() / 1000);
-        const trialEndDate = now + 7 * 24 * 60 * 60;
+        const trialEndDate = now + 7 * 24 * 60 * 60; // 7 days
 
         return await stripe.subscriptionSchedules.create({
             customer: customerId,
@@ -58,11 +63,17 @@ async function createSubscriptionSchedule(customerId, trialPriceId, paidPriceId,
                     items: [{ price: trialPriceId }],
                     trial: true,
                     end_date: trialEndDate,
-                    metadata: { phase: process.env.PHASE_STATUS_TRIAL, paymentIntent: paymentIntent.id },
+                    metadata: {
+                        phase: process.env.PHASE_STATUS_TRIAL,
+                        paymentIntent: paymentIntent.id },
                 },
                 {
-                    items: [{ price: trialPriceId }],
-                    metadata: { phase: process.env.PHASE_STATUS_HELD, paymentIntent: paymentIntent.id },
+                    items: [{ price: paidPriceId }],
+                    metadata: {
+                        phase: process.env.PHASE_STATUS_HELD,
+                        paymentIntent: paymentIntent.id,
+                    },
+                    trial: true,
                     default_payment_method: paymentMethodId,
                     iterations: 1,
                 },
@@ -70,9 +81,10 @@ async function createSubscriptionSchedule(customerId, trialPriceId, paidPriceId,
                     items: [{ price: paidPriceId }],
                     billing_cycle_anchor: "phase_start",
                     collection_method: "charge_automatically",
-                    proration_behavior: "none",
                     default_payment_method: paymentMethodId,
-                    metadata: { phase: process.env.PHASE_STATUS_PAID, paymentIntent: paymentIntent.id },
+                    metadata: {
+                        phase: process.env.PHASE_STATUS_PAID,
+                        paymentIntent: paymentIntent.id },
                 },
             ],
         });
@@ -90,16 +102,19 @@ async function createSubscription(req, res) {
         }
 
         const paymentMethodId = await createPaymentMethod(type, cardTokenId);
-        const { customer, paymentIntent } = await createCustomerAndSavePayment(contactEmail, paymentMethodId, priceId);
+        const { customer, paymentIntent, requiresAction, clientSecret } = await createCustomerAndSavePayment(contactEmail, paymentMethodId, priceId);
+        if (requiresAction) { // 3D security required
+            return res.json({ success: false, requiresAction: true, clientSecret: clientSecret });
+        }
         const subscriptionSchedule = await createSubscriptionSchedule(
             customer.id,
             process.env.TRIAL_STRIPE_PRICE_ID,
-            process.env.TREND_STRIPE_PRICE_ID,
+            priceId,
             paymentMethodId,
             paymentIntent
         );
 
-        res.json({ success: true, subscriptionSchedule });
+        res.json({ success: true, subscriptionSchedule, requiresAction: false });
     } catch (error) {
         await writeLog(`Error in /create-subscription: ${error.message}`);
         res.json({ success: false, error: error.message });
@@ -124,63 +139,28 @@ async function handleWebhook(req, res) {
                 const invoice = event.data.object;
                 const phase = invoice.subscription_details?.metadata?.phase;
                 const paymentIntentId = invoice.subscription_details?.metadata?.paymentIntent;
-
-                if (paymentIntentId && phase === process.env.PHASE_STATUS_HELD) {
+                if (paymentIntentId && phase === process.env.PHASE_STATUS_TRIAL) {
                     await stripe.paymentIntents.capture(paymentIntentId);
                     await writeLog(`Captured payment for invoice ${invoice.id}`);
                 }
                 break;
-            case "customer.subscription.updated":
-                const subscription = event.data.object;
-                if (subscription.status === "active") {
-                    const currentPhase = subscription.metadata?.phase;
-                    if (currentPhase === process.env.PHASE_STATUS_HELD) {
-                        // Fetch subscription schedules for the customer
-                        const schedules = await stripe.subscriptionSchedules.list({
-                            customer: subscription.customer,
-                        });
-
-                        if (!schedules.data.length) {
-                            await writeLog(`No subscription schedule found for customer ${subscription.customer}`);
-                            return res.status(400).send("No subscription schedule found.");
-                        }
-
-                        // Find the active schedule
-                        const activeSchedule = schedules.data.find((s) => s.status === "active");
-                        if (!activeSchedule) {
-                            await writeLog(`No active subscription schedule found for subscription ${subscription.id}`);
-                            return res.status(400).send("No active subscription schedule found.");
-                        }
-
-                        // Extract the paid phase from the active schedule
-                        const paidPhase = activeSchedule.phases.find(
-                            (phase) => phase.metadata?.phase === process.env.PHASE_STATUS_PAID
-                        );
-
-                        if (!paidPhase) {
-                            await writeLog(`No paid phase found for subscription ${subscription.id}`);
-                            return res.status(400).send("Paid phase not found.");
-                        }
-
-                        const paidPriceId = paidPhase.items[0]?.price;
-                        if (!paidPriceId) {
-                            await writeLog(`No price found for paid phase in subscription ${subscription.id}`);
-                            return res.status(400).send("Price ID not found for paid phase.");
-                        }
-
-                        // Update subscription to move to the paid phase
-                        await stripe.subscriptions.update(subscription.id, {
-                            items: [{ price: paidPriceId }],
-                            metadata: {
-                                phase: process.env.PHASE_STATUS_HELD,
-                                paymentIntent: subscription.metadata?.paymentIntent
-                            },
-                        });s
-
-                        await writeLog(`Subscription ${subscription.id} upgraded to paid phase with price ${paidPriceId}`);
+            case "customer.subscription.deleted":
+                // When the subscription is deleted, capture uncaptured payments if any
+                console.log('event',event);
+                const deletedSubscription = event.data.object;
+                const phase_trial = deletedSubscription.metadata?.phase;
+                const paymentIntentIdForCancellation = deletedSubscription.metadata?.paymentIntent;
+                if (paymentIntentIdForCancellation && phase_trial === process.env.PHASE_STATUS_TRIAL) {
+                    try {
+                        // If the payment intent exists, attempt to capture it
+                        await stripe.paymentIntents.cancel(paymentIntentIdForCancellation);
+                        await writeLog(`Cancel payment for paymentIntent ${paymentIntentIdForCancellation} due to subscription cancellation.`);
+                    } catch (error) {
+                        await writeLog(`Failed to capture payment for paymentIntent ${paymentIntentIdForCancellation}: ${error.message}`);
                     }
                 }
                 break;
+            case "payment_intent.payment_failed":
             case "invoice.payment_failed":
                 const failedInvoice = event.data.object;
                 const failedCustomer = await stripe.customers.retrieve(failedInvoice.customer);
